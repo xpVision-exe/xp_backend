@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from DTWAnalysis import DTW
+from DTWAnalysis import DTW, FindDistance
 
 def normalize(signal):
     signal = np.asarray(signal)
@@ -16,7 +16,7 @@ def EvaluateExercise(exerciseName: str, exerciseDataFrame: pd.DataFrame):
     
     elif(exerciseName == "LegPush"):
         referenceDataFrame = pd.read_csv("ExercisesReferences/LegPushSideWaysReference.csv")
-        evaluation_angles = ["left_knee_angle", "trunk_angle"]
+        evaluation_angles = ["left_knee_angle"]
      
     elif(exerciseName == "BicepCurl"):
         referenceDataFrame = pd.read_csv("ExercisesReferences/BicepCurlSideWaysReference.csv")
@@ -26,7 +26,9 @@ def EvaluateExercise(exerciseName: str, exerciseDataFrame: pd.DataFrame):
         referenceDataFrame = pd.read_csv("ExercisesReferences/PreacherCurlSideWaysReference.csv")
         evaluation_angles = ["left_elbow_angle", "left_armpit_angle", "left_shoulder_angle"]
     
-    errors = []
+    signals_errors = []
+    optimal_paths = []
+    error_signals = []
     for evaluation_angle in evaluation_angles:
         referenceTimeSeries = referenceDataFrame[evaluation_angle].to_numpy()
         exerciseTimeSeries = exerciseDataFrame[evaluation_angle].to_numpy()
@@ -34,11 +36,20 @@ def EvaluateExercise(exerciseName: str, exerciseDataFrame: pd.DataFrame):
         normalized_referenceTimeSeries = normalize(referenceTimeSeries)
         normalized_exerciseTimeSeries = normalize(exerciseTimeSeries)
 
-        error, optimal_path, costMatrix = DTW(normalized_referenceTimeSeries, normalized_exerciseTimeSeries)
-        avg_error = error / len(optimal_path)
+        signalError, optimal_indicies, costMatrix = DTW(normalized_referenceTimeSeries, normalized_exerciseTimeSeries)
 
-        errors.append(avg_error)
-    errors = np.array(errors)
-    print(errors)
-    error = np.mean(errors)
-    return error, evaluation_angles
+        errorSignal = []
+        for (i, j) in optimal_indicies:
+            pointError = FindDistance(normalized_referenceTimeSeries[i], normalized_exerciseTimeSeries[j])
+            errorSignal.append(pointError)
+        
+        error_signals.append(errorSignal)
+        print(optimal_indicies)
+        avg_error = signalError / len(optimal_indicies)
+        optimal_paths.append(optimal_indicies)
+
+        signals_errors.append(avg_error)
+    signals_errors = np.array(signals_errors)
+    print(signals_errors)
+    signalError = np.mean(signals_errors)
+    return signalError, evaluation_angles, optimal_paths, error_signals

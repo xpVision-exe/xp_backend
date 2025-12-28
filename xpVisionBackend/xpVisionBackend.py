@@ -23,6 +23,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def performDTW(inputs: DTWDTO):
     return DTW(inputs.signal1, inputs.signal2)  
 
+@app.post("uploadgyroreadings")
+
 @app.post("/uploadvideo")
 async def create_upload_file(exerciseName: str, file: UploadFile):
     try:
@@ -32,11 +34,13 @@ async def create_upload_file(exerciseName: str, file: UploadFile):
         raw_data = ExtractLandmarkAngles("pose.mp4")
         exercise_df = ExtractCSVDataFromLandmarkAngles(raw_data)
         exercise_df.to_csv("static/exerciseDataFrame.csv")
-        error, evaluation_angles = EvaluateExercise(exerciseName, exercise_df)
+        error, evaluation_angles, optimal_indicies, error_signals = EvaluateExercise(exerciseName, exercise_df)
         responseDTO = {
                 "message": "Success",
                 "exerciseError": error,
-                "parametersOfPlotting": evaluation_angles
+                "parametersOfPlotting": evaluation_angles,
+                "optimal_indicies": optimal_indicies,
+                "error_signals": error_signals
             }
         return responseDTO
 

@@ -37,6 +37,5 @@ def DTW(signal1, signal2):
       i, j = backTrackingMatrix[i, j]
       if(i == -1 or j == -1):
           break
-      path.append((int(i), int(j)))
   path.reverse()
   return costMatrix[signal1Len - 1][signal2Len - 1], path, costMatrix
