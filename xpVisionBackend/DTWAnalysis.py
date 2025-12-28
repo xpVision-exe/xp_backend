@@ -39,5 +39,4 @@ def DTW(signal1, signal2):
           break
       path.append((int(i), int(j)))
   path.reverse()
-  print(path)
-  return costMatrix[signal1Len - 1][signal2Len - 1]
+  return costMatrix[signal1Len - 1][signal2Len - 1], path

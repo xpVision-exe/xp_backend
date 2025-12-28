@@ -1,17 +1,9 @@
 import cv2
 import numpy as np
+import pandas as pd
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-
-LIMBS = {
-    "left_arm": ["left_shoulder","left_elbow","left_wrist"],
-    "right_arm": ["right_shoulder","right_elbow","right_wrist"],
-    "left_leg": ["left_hip","left_knee","left_ankle"],
-    "right_leg": ["right_hip","right_knee","right_ankle"],
-    "trunk": ["left_shoulder","right_shoulder","left_hip","right_hip"],
-    "neck": ["head","neck"]
-}
 
 JOINTS_IDX = {
     "left_shoulder":11, "right_shoulder":12,
@@ -44,6 +36,9 @@ ANGLE_DEFS = {
 
     "left_knee":  ("left_hip", "left_knee", "left_ankle"),
     "right_knee": ("right_hip", "right_knee", "right_ankle"),
+
+    "neck": ("head", "neck", "shoulder_center"),
+    "trunk": ("shoulder_center", "hip_center", "Sacrum")
 }
 
 
@@ -77,7 +72,63 @@ def classify_pose(theta, omega, rom_min=0, rom_max=180):
     acc = 0.95 if position!="LOW" else 0.9
     return position + "_" + phase, acc
 
+def get_point(landmarks, name):
+    idx = JOINTS_IDX[name]
+    return np.array([landmarks[idx].x, landmarks[idx].y])
 
+def GetBodyPartsAnglesFromLandmark(landmarks, time_stamp):
+    raw_data = []
+
+    # Virtual joints
+    shoulder_center = np.mean([
+        get_point(landmarks, "left_shoulder"),
+        get_point(landmarks, "right_shoulder")
+    ], axis=0)
+
+    hip_center = np.mean([
+        get_point(landmarks, "left_hip"),
+        get_point(landmarks, "right_hip")
+    ], axis=0)
+
+    sacrum = np.array([hip_center[0], hip_center[1]-0.1])
+    virtual = {
+        "shoulder_center": shoulder_center,
+        "hip_center": hip_center,
+        "Sacrum": sacrum
+
+    }
+
+    for angle_name, (a, b, c) in ANGLE_DEFS.items():
+
+        p1 = virtual[a] if a in virtual else get_point(landmarks, a)
+        p2 = virtual[b] if b in virtual else get_point(landmarks, b)
+        p3 = virtual[c] if c in virtual else get_point(landmarks, c)
+
+        theta = calculate_angle(p1, p2, p3)
+        raw_data.append([time_stamp, angle_name, theta])
+
+    return raw_data
+
+def GenerateAnnotatedFrame(landmarks, frame):
+
+    POSE_CONNECTIONS = [
+    (11,13),(13,15),(12,14),(14,16),
+    (23,25),(25,27),(24,26),(26,28),
+    (11,12),(23,24),(11,23),(12,24),(0,11),(0,12)
+    ]
+
+    h, w, c = frame.shape
+    annotated_frame = frame.copy()
+    for i, j in POSE_CONNECTIONS:
+        x1, y1 = int(landmarks[i].x * w), int(landmarks[i].y * h)
+        x2, y2 = int(landmarks[j].x * w), int(landmarks[j].y * h)
+        cv2.line(annotated_frame, (x1,y1), (x2,y2), (255,255,255), 2)
+
+    for p in landmarks:
+        x, y = int(p.x * w), int(p.y * h)
+        cv2.circle(annotated_frame, (x,y), 4, (0,255,0), -1)
+
+    return annotated_frame
 
 def ExtractLandmarkAngles(video_path: str):
     raw_data = []
@@ -92,11 +143,20 @@ def ExtractLandmarkAngles(video_path: str):
     pose_landmarker = vision.PoseLandmarker.create_from_options(options)
 
     cap = cv2.VideoCapture(video_path)
+
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps == 0:
         fps = 30
     dt = 1 / fps
     frame_id = 0
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    out = cv2.VideoWriter(
+        "annotated_video.mp4",
+        cv2.VideoWriter_fourcc(*'mp4v'),
+        fps, (w, h)
+    )
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -114,55 +174,24 @@ def ExtractLandmarkAngles(video_path: str):
 
         time_stamp = frame_id/fps
 
+        limbs_data = GetBodyPartsAnglesFromLandmark(landmarks, time_stamp)
+        annotated_frame = GenerateAnnotatedFrame(landmarks, frame)
+        out.write(annotated_frame)
+        raw_data.extend(limbs_data)
+
         frame_id+=1
 
     cap.release()
+    out.release()
     pose_landmarker.close()
-
-
-def GetBodyPartsAnglesFromLandmark(landmarks, time_stamp):
-    raw_data = []
-
-    for limb in ["left_arm", "right_arm", "left_leg", "right_leg"]:
-        if limb == "left_arm":
-            a, b, c = JOINTS_IDX["left_shoulder"], JOINTS_IDX["left_elbow"], JOINTS_IDX["left_wrist"]
-        elif limb == "right_arm":
-            a, b, c = JOINTS_IDX["right_shoulder"], JOINTS_IDX["right_elbow"], JOINTS_IDX["right_wrist"]
-        elif limb == "left_leg":
-            a, b, c = JOINTS_IDX["left_hip"], JOINTS_IDX["left_knee"], JOINTS_IDX["left_ankle"]
-        elif limb == "right_leg":
-            a, b, c = JOINTS_IDX["right_hip"], JOINTS_IDX["right_knee"], JOINTS_IDX["right_ankle"]
-
-        p1 = [landmarks[a].x, landmarks[a].y]
-        p2 = [landmarks[b].x, landmarks[b].y]
-        p3 = [landmarks[c].x, landmarks[c].y]
-
-        theta = calculate_angle(p1, p2, p3)
-        raw_data.append([time_stamp, limb, theta])
-
-    # Trunk angle
-    shoulder_mid = np.mean(
-        [[landmarks[11].x, landmarks[11].y],
-         [landmarks[12].x, landmarks[12].y]],
-        axis=0
-    )
-
-    hip_mid = np.mean(
-        [[landmarks[23].x, landmarks[23].y],
-         [landmarks[24].x, landmarks[24].y]],
-        axis=0
-    )
-
-    trunk_theta = calculate_angle(
-        shoulder_mid, hip_mid, [hip_mid[0], hip_mid[1] - 0.1]
-    )
-    raw_data.append([time_stamp, "trunk", trunk_theta])
-
-    # Neck angle
-    head = [landmarks[0].x, landmarks[0].y]
-    neck = [landmarks[1].x, landmarks[1].y]
-    neck_theta = calculate_angle(head, neck, shoulder_mid)
-    raw_data.append([time_stamp, "neck", neck_theta])
-
     return raw_data
 
+def ExtractCSVDataFromLandmarkAngles(raw_data: list):
+    df_angles = pd.DataFrame(raw_data, columns=["time","limb","theta"])
+    df_series_dictionary = {}
+    df_series_dictionary["time"] = df_angles["time"].unique()
+    for limb in df_angles["limb"].unique():
+      df_series_dictionary[limb + "_angle"] = df_angles[df_angles["limb"] == limb]["theta"].to_numpy()
+    
+    df_output = pd.DataFrame(df_series_dictionary)
+    return df_output
