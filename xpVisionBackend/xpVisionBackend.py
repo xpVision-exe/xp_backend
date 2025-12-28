@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from DTWAnalysis import DTW
 from ComputerVisionAnalysis import ExtractLandmarkAngles, ExtractCSVDataFromLandmarkAngles
 from typing import List
-from ExersicesEvaluator import EvaluateExersice
+from ExercisesEvaluator import EvaluateExercise
 
 
 class DTWDTO(BaseModel):
@@ -27,24 +27,23 @@ async def performDTW(inputs: DTWDTO):
 async def create_upload_file(exerciseName: str, file: UploadFile):
     try:
         contents = await file.read()
-        with open(file.filename, "wb") as binary_file:
+        with open("pose.mp4", "wb") as binary_file:
             binary_file.write(contents)
-        raw_data = ExtractLandmarkAngles(file.filename)
+        raw_data = ExtractLandmarkAngles("pose.mp4")
         exercise_df = ExtractCSVDataFromLandmarkAngles(raw_data)
         exercise_df.to_csv("static/exerciseDataFrame.csv")
+        error, evaluation_angles = EvaluateExercise(exerciseName, exercise_df)
+        responseDTO = {
+                "message": "Success",
+                "exerciseError": error,
+                "parametersOfPlotting": evaluation_angles
+            }
+        return responseDTO
 
-    except Error:
+    except Exception:
         return JSONResponse(
             content = {
-                "message:": Error
+                "message:": Exception
                 },
             status_code=500
             )
-    
-    error, evaluation_angles = EvaluateExersice(exerciseName, exercise_df)
-    responseDTO = {
-            "message": "Success",
-            "exerciseError": error,
-            "parametersOfPlotting": evaluation_angles
-        }
-    return responseDTO
