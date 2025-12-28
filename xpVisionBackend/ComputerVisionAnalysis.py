@@ -153,7 +153,7 @@ def ExtractLandmarkAngles(video_path: str):
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     out = cv2.VideoWriter(
-        "annotated_video.mp4",
+        "static/annotated_video.mp4",
         cv2.VideoWriter_fourcc(*'mp4v'),
         fps, (w, h)
     )
