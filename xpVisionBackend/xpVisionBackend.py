@@ -15,7 +15,7 @@ app = FastAPI()
 async def performDTW(inputs: DWTDTO):
     return DTW(inputs.signal1, inputs.signal2)  
 
-@app.post("/uploadfile/")
+@app.post("/uploadvideo/")
 async def create_upload_file(file: UploadFile):
     contents = await file.read()
     with open(file.filename, "wb") as binary_file:
