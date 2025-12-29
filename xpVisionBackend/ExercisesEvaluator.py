@@ -29,6 +29,7 @@ def EvaluateExercise(exerciseName: str, exerciseDataFrame: pd.DataFrame):
     signals_errors = []
     optimal_paths = []
     error_signals = []
+    #O(EvaluationAngles * OptimalIndicies)
     for evaluation_angle in evaluation_angles:
         referenceTimeSeries = referenceDataFrame[evaluation_angle].to_numpy()
         exerciseTimeSeries = exerciseDataFrame[evaluation_angle].to_numpy()
@@ -50,6 +51,5 @@ def EvaluateExercise(exerciseName: str, exerciseDataFrame: pd.DataFrame):
 
         signals_errors.append(avg_error)
     signals_errors = np.array(signals_errors)
-    print(signals_errors)
     signalError = np.mean(signals_errors)
     return signalError, evaluation_angles, optimal_paths, error_signals

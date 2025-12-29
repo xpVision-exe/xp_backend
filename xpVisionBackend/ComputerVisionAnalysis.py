@@ -130,6 +130,7 @@ def GenerateAnnotatedFrame(landmarks, frame):
 
     return annotated_frame
 
+#Overall function complexity: O(frameNum * (numberOfAngles + pose connections + landmarks))
 def ExtractLandmarkAngles(video_path: str):
     raw_data = []
     pose_seq = []
@@ -158,6 +159,7 @@ def ExtractLandmarkAngles(video_path: str):
         fps, (w, h)
     )
 
+    #O(frameNum)
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
@@ -174,7 +176,10 @@ def ExtractLandmarkAngles(video_path: str):
 
         time_stamp = frame_id/fps
 
+        #O(numberofAngles)
         limbs_data = GetBodyPartsAnglesFromLandmark(landmarks, time_stamp)
+
+        #O(pose connections + landmarks)
         annotated_frame = GenerateAnnotatedFrame(landmarks, frame)
         out.write(annotated_frame)
         raw_data.extend(limbs_data)

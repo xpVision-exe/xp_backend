@@ -5,6 +5,7 @@ import math
 def FindDistance(num1, num2):
   return abs(num1 - num2)
 
+#Overall complexity: O(signal1Len * signal2Len)
 def DTW(signal1, signal2):
   signal1Len = len(signal1)
   signal2Len = len(signal2)
