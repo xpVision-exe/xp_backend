@@ -37,7 +37,7 @@ async def create_upload_file(exerciseName: str, file: UploadFile):
         error, evaluation_angles, optimal_indicies, error_signals = EvaluateExercise(exerciseName, exercise_df)
         responseDTO = {
                 "message": "Success",
-                "exerciseError": (1- error) * 100,
+                "exerciseAccuracy": (1- error) * 100,
                 "parametersOfPlotting": evaluation_angles,
                 "optimal_indicies": optimal_indicies,
                 "error_signals": error_signals
